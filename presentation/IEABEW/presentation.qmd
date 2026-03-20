@@ -189,8 +189,6 @@ summary_tbl <- tibble(
 knitr::kable(summary_tbl, format = "markdown", align = "lrrrr")
 ```
 
-On average, bidders entered at **`r entry_pct`%** of the way through the bidding sequence. **`r first_pct`%** of bidders placed the first bid on a property.
-
 ## Correlations
 
 :::: {layout="[2,1]"}

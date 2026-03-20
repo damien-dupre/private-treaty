@@ -670,13 +670,23 @@
     }, 300);
   }
 
-  // Advance on any key press
+  // Forward arrow keys to parent (reveal.js) so slide navigation works
   document.addEventListener('keydown', function(e) {
+    const arrows = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape'];
+    if (arrows.includes(e.key)) {
+      // Pass the key event to the parent window for reveal.js
+      window.parent.document.dispatchEvent(new KeyboardEvent('keydown', {
+        key: e.key, code: e.code, keyCode: e.keyCode,
+        bubbles: true, cancelable: true
+      }));
+      return;
+    }
+    // Space or any other key advances messages
     e.preventDefault();
     revealNext();
   });
 
-  // Also advance on click
+  // Click advances messages
   document.addEventListener('click', function() {
     revealNext();
   });
