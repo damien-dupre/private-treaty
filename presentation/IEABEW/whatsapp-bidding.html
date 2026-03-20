@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bidding War - WhatsApp Style</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0b141a;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, sans-serif;
+    padding: 20px;
+  }
+
+  .phone {
+    width: 620px;
+    background: #0b141a;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    border: 2px solid #2a3942;
+  }
+
+  /* Header */
+  .header {
+    background: #1f2c34;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #2a3942;
+  }
+
+  .header-back { color: #00a884; font-size: 24px; }
+
+  .header-avatar {
+    width: 48px; height: 48px;
+    background: #00a884;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+
+  .header-info { flex: 1; }
+  .header-name { color: #e9edef; font-size: 20px; font-weight: 600; }
+  .header-members { color: #8696a0; font-size: 14px; }
+
+  /* Chat area */
+  .chat {
+    background: #0b141a;
+    background-image:
+      radial-gradient(circle at 20% 50%, rgba(0,168,132,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(0,168,132,0.03) 0%, transparent 50%);
+    padding: 8px 12px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  /* Date separator */
+  .date-sep {
+    text-align: center;
+    margin: 12px 0;
+  }
+  .date-sep span {
+    background: #182229;
+    color: #8696a0;
+    font-size: 14px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-weight: 500;
+  }
+
+  /* System message */
+  .system-msg {
+    text-align: center;
+    margin: 8px 0;
+  }
+  .system-msg span {
+    background: #182229;
+    color: #8696a0;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-style: italic;
+  }
+
+  /* Message bubble */
+  .msg {
+    display: flex;
+    margin: 3px 0;
+  }
+  .msg.other { justify-content: flex-start; }
+  .msg.self  { justify-content: flex-end; }
+
+  .bubble {
+    max-width: 80%;
+    padding: 10px 14px 6px 14px;
+    border-radius: 8px;
+    position: relative;
+    line-height: 1.35;
+  }
+
+  .msg.other .bubble {
+    background: #1f2c34;
+    border-top-left-radius: 2px;
+  }
+
+  .msg.self .bubble {
+    background: #005c4b;
+    border-top-right-radius: 2px;
+  }
+
+  .sender {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .text {
+    color: #e9edef;
+    font-size: 18px;
+  }
+
+  .bid-amount {
+    font-weight: 600;
+    font-size: 20px;
+  }
+
+  .time {
+    color: #8696a0;
+    font-size: 12px;
+    text-align: right;
+    margin-top: 2px;
+  }
+
+  /* Bidder colours */
+  .c1 { color: #25d366; }
+  .c2 { color: #53bdeb; }
+  .c3 { color: #ff6b6b; }
+  .c4 { color: #ffd43b; }
+  .c5 { color: #cc5de8; }
+
+  /* Emoji reactions */
+  .reaction {
+    font-size: 12px;
+    background: #1f2c34;
+    border: 1px solid #2a3942;
+    border-radius: 10px;
+    padding: 1px 6px;
+    display: inline-block;
+    margin-top: 2px;
+  }
+
+  /* Typing indicator */
+  .typing {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 14px;
+    background: #1f2c34;
+    border-radius: 8px;
+    width: fit-content;
+    margin: 6px 0;
+  }
+  .typing .dot {
+    width: 7px; height: 7px;
+    background: #8696a0;
+    border-radius: 50%;
+    animation: typing-bounce 1.4s ease-in-out infinite;
+  }
+  .typing .dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing .dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-4px); }
+  }
+
+  /* Annotations */
+  .annotation {
+    text-align: center;
+    margin: 10px 0;
+    padding: 6px 14px;
+  }
+  .annotation span {
+    background: rgba(233, 69, 96, 0.15);
+    color: #e94560;
+    font-size: 11px;
+    padding: 4px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <!-- Header -->
+  <div class="header">
+    <span class="header-back">&larr;</span>
+    <div class="header-avatar">🏠</div>
+    <div class="header-info">
+      <div class="header-name">A 3 Bed Semi - Somewhere in Ireland</div>
+      <div class="header-members">First bid: €420,000</div>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div class="chat">
+
+    <div class="date-sep"><span>28 August</span></div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c1">Bidder A</div>
+        <div class="text"><span class="bid-amount">€420,000</span></div>
+        <div class="time">16:02</div>
+      </div>
+    </div>
+
+    <div class="date-sep"><span>30 August</span></div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€425,000</span></div>
+        <div class="text" style="font-size:12px; color:#a0d2db;">Nice house. Let's keep this civilised.</div>
+        <div class="time">12:58 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€430,000</span></div>
+        <div class="time">16:06</div>
+      </div>
+    </div>
+
+    <div class="date-sep"><span>31 August</span></div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c1">Bidder A</div>
+        <div class="text"><span class="bid-amount">€432,000</span></div>
+        <div class="time">16:30</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€450,000</span> 💪</div>
+        <div class="time">17:02</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text" style="font-size:12px; color:#a0d2db;">Excuse me??? €18k in one go???</div>
+        <div class="time">17:04 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c1">Bidder A</div>
+        <div class="text"><span class="bid-amount">€451,000</span></div>
+        <div class="time">18:10</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€456,789</span></div>
+        <div class="time">19:08</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text" style="font-size:12px; color:#a0d2db;">€456,789? Is that your phone number or a bid?</div>
+        <div class="time">19:10 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c1">Bidder A</div>
+        <div class="text"><span class="bid-amount">€459,876</span></div>
+        <div class="time">20:01</div>
+      </div>
+    </div>
+
+    <div class="date-sep"><span>1-2 September</span></div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text" style="font-size:12px; color:#a0d2db;">Oh great, more people. This is fine. Everything is fine. 🔥</div>
+        <div class="time">1 Sep 17:25 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c4">Bidder D</div>
+        <div class="text"><span class="bid-amount">€464,900</span></div>
+        <div class="time">1 Sep 17:20</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€470,000</span></div>
+        <div class="time">1 Sep 18:55</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c5">Bidder E</div>
+        <div class="text"><span class="bid-amount">€472,000</span></div>
+        <div class="time">2 Sep 11:01</div>
+      </div>
+    </div>
+
+    <div class="date-sep"><span>2-6 September</span></div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text" style="font-size:12px; color:#a0d2db;">Right. Enough messing around.</div>
+        <div class="time">6 Sep 13:39 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€500,000</span> 🎯</div>
+        <div class="text" style="font-size:12px; color:#a0d2db;">Half a million. That should shut them up.</div>
+        <div class="time">6 Sep 13:40 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="date-sep"><span>7 September</span></div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€506,000</span></div>
+        <div class="time">09:01</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text" style="font-size:12px; color:#a0d2db;">It did not shut them up.</div>
+        <div class="time">09:02 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€510,000</span></div>
+        <div class="time">11:09 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€511,000</span></div>
+        <div class="time">11:50</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€515,000</span></div>
+        <div class="text" style="font-size:12px; color:#a0d2db;">€1k more? Really? That's not even a sofa.</div>
+        <div class="time">11:57 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€516,000</span></div>
+        <div class="time">13:04</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€517,000</span></div>
+        <div class="text" style="font-size:12px; color:#a0d2db;">This is personal now, Bidder C.</div>
+        <div class="time">13:15 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€520,000</span></div>
+        <div class="time">14:23</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€525,000</span></div>
+        <div class="text" style="font-size:12px; color:#a0d2db;">My mortgage advisor just blocked my number.</div>
+        <div class="time">14:36 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€526,000</span></div>
+        <div class="time">14:47</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€527,000</span> ⚡</div>
+        <div class="time">14:48 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€530,000</span></div>
+        <div class="time">14:54</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€531,000</span></div>
+        <div class="text" style="font-size:12px; color:#a0d2db;">I've forgotten what the house even looks like.</div>
+        <div class="time">14:55 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€539,000</span></div>
+        <div class="time">15:51</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€540,000</span></div>
+        <div class="text" style="font-size:12px; color:#a0d2db;">At this point I just want to win. It's not about the house anymore.</div>
+        <div class="time">15:51 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€550,000</span></div>
+        <div class="time">15:59</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€552,000</span></div>
+        <div class="text" style="font-size:12px; color:#a0d2db;">I hope Bidder C stubs their toe on the way to the notary.</div>
+        <div class="time">16:00 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€560,000</span></div>
+        <div class="time">16:15</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€565,000</span></div>
+        <div class="text" style="font-size:12px; color:#a0d2db;">I'm not crying. There's something in my eye. Possibly my life savings.</div>
+        <div class="time">16:33 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg other">
+      <div class="bubble">
+        <div class="sender c3">Bidder C</div>
+        <div class="text"><span class="bid-amount">€568,000</span></div>
+        <div class="time">16:42</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text"><span class="bid-amount">€570,000</span> 🏁</div>
+        <div class="text" style="font-size:12px; color:#a0d2db;">TAKE IT. I never want to see a notification again.</div>
+        <div class="time">16:43 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text" style="font-size:12px; color:#a0d2db;">Did... did I just pay €150k more than the opening bid for a 3-bed semi?</div>
+        <div class="time">16:45 ✓✓</div>
+      </div>
+    </div>
+
+    <div class="msg self">
+      <div class="bubble">
+        <div class="text" style="font-size:12px; color:#a0d2db;">Don't tell my partner.</div>
+        <div class="time">16:46 ✓✓</div>
+      </div>
+    </div>
+
+    <div style="height: 10px;"></div>
+
+  </div>
+</div>
+
+<!-- Instructions overlay -->
+<div id="instructions" style="
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(31,44,52,0.95);
+  color: #8696a0;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  border: 1px solid #2a3942;
+  z-index: 100;
+  transition: opacity 0.5s;
+">Press any key or click to advance &middot; <span id="counter">0 / 0</span></div>
+
+<script>
+(function() {
+  const chat = document.querySelector('.chat');
+  const items = chat.querySelectorAll('.msg, .date-sep');
+  const total = items.length;
+  let revealed = 0;
+  let animating = false; // block input during auto-reveal
+
+  // Create a reusable typing indicator
+  const typingEl = document.createElement('div');
+  typingEl.className = 'typing';
+  typingEl.style.opacity = '0';
+  typingEl.style.transition = 'opacity 0.25s ease';
+  typingEl.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+  chat.appendChild(typingEl);
+
+  // Hide all items initially
+  items.forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(12px)';
+    el.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+  });
+
+  const counter = document.getElementById('counter');
+  const instructions = document.getElementById('instructions');
+  counter.textContent = `0 / ${total}`;
+
+  function revealOne(el) {
+    el.style.opacity = '1';
+    el.style.transform = 'translateY(0)';
+  }
+
+  function scrollTo(el) {
+    const elTop = el.offsetTop;
+    const chatHeight = chat.clientHeight;
+    chat.scrollTo({ top: elTop - chatHeight / 2, behavior: 'smooth' });
+  }
+
+  function showTypingBefore(nextEl) {
+    // Insert the typing indicator just before the message it precedes
+    nextEl.parentNode.insertBefore(typingEl, nextEl);
+    typingEl.style.opacity = '1';
+    scrollTo(typingEl);
+  }
+
+  function hideTyping() {
+    typingEl.style.opacity = '0';
+  }
+
+  function updateCounter() {
+    counter.textContent = `${revealed} / ${total}`;
+    if (revealed >= total) {
+      instructions.style.opacity = '0';
+      setTimeout(() => instructions.style.display = 'none', 500);
+    }
+  }
+
+  function revealNext() {
+    if (revealed >= total || animating) return;
+
+    const el = items[revealed];
+
+    // Date separators: reveal and wait for next click
+    if (el.classList.contains('date-sep')) {
+      revealOne(el);
+      scrollTo(el);
+      revealed++;
+      updateCounter();
+      return;
+    }
+
+    // Self messages: reveal all consecutive self messages, then auto-show
+    // typing dots and auto-reveal the next other message
+    if (el.classList.contains('self')) {
+      // Reveal all consecutive self messages
+      while (revealed < total && items[revealed].classList.contains('self')) {
+        revealOne(items[revealed]);
+        revealed++;
+      }
+      scrollTo(items[revealed - 1]);
+      updateCounter();
+
+      // Auto-reveal all consecutive "other" messages with typing dots between each
+      autoRevealOthers();
+      return;
+    }
+
+    // Other messages: reveal, then auto-chain any further consecutive others
+    revealOne(el);
+    scrollTo(el);
+    revealed++;
+    updateCounter();
+    autoRevealOthers();
+  }
+
+  function autoRevealOthers() {
+    if (revealed >= total || !items[revealed].classList.contains('other')) {
+      animating = false;
+      return;
+    }
+    animating = true;
+    setTimeout(() => {
+      showTypingBefore(items[revealed]);
+      setTimeout(() => {
+        hideTyping();
+        revealOne(items[revealed]);
+        scrollTo(items[revealed]);
+        revealed++;
+        updateCounter();
+        // Chain: if next is also "other", keep going
+        autoRevealOthers();
+      }, 600);
+    }, 300);
+  }
+
+  // Advance on any key press
+  document.addEventListener('keydown', function(e) {
+    e.preventDefault();
+    revealNext();
+  });
+
+  // Also advance on click
+  document.addEventListener('click', function() {
+    revealNext();
+  });
+})();
+</script>
+
+</body>
+</html>

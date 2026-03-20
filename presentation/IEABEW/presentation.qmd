@@ -1,0 +1,572 @@
+---
+title: "Characterising Online Private Treaty Negotiations"
+subtitle: "Field Evidence from Irish Residential Property"
+author: "Damien Dupré and Healy Hynes"
+format:
+  revealjs:
+    theme: [theme/metropolis.scss]
+    toc-depth: 1
+    chalkboard: false
+    menu: true
+    slide-number: true
+    revealjs-plugins:
+      - attribution
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+# Load raw data
+raw <- read_csv(
+  "../../data/dcu_beagel_dataset_20251201.csv",
+  show_col_types = FALSE
+) |>
+  rename(
+    sale_id    = `Synthetic Sale ID`,
+    bid_amount = `Bid Amount`,
+    timestamp  = `Unix Timestamp`,
+    bidder_id  = `Bidder ID`
+  ) |>
+  mutate(datetime = as.POSIXct(timestamp, origin = "1970-01-01", tz = "UTC"))
+
+# Property-level: sort bids within each property by time
+bids <- raw |>
+
+  arrange(sale_id, timestamp)
+
+# Compute consecutive bid increments and latencies (property level)
+bids <- bids |>
+  group_by(sale_id) |>
+  mutate(
+    bid_increment  = bid_amount - lag(bid_amount),
+    time_diff_hrs  = as.numeric(difftime(datetime, lag(datetime), units = "hours"))
+  ) |>
+  ungroup()
+
+# Property-level summaries
+prop_summary <- bids |>
+  group_by(sale_id) |>
+  summarise(
+    n_participants = n_distinct(bidder_id),
+    n_bids         = n(),
+    first_offer    = first(bid_amount),
+    last_offer     = last(bid_amount),
+    premium_pct    = (last_offer - first_offer) / first_offer * 100,
+    .groups = "drop"
+  )
+
+# Filter to properties with 2+ participants
+prop_summary <- prop_summary |>
+  filter(n_participants >= 2)
+
+# Participant-level summaries
+# Identify each bidder's first bid position within a property
+bidder_summary <- bids |>
+  filter(sale_id %in% prop_summary$sale_id) |>
+  group_by(sale_id) |>
+  mutate(
+    bid_order       = row_number(),
+    total_bids_prop = n()
+  ) |>
+  ungroup() |>
+  group_by(sale_id, bidder_id) |>
+  summarise(
+    avg_bid_increment = mean(bid_increment, na.rm = TRUE),
+    avg_reaction_hrs  = mean(time_diff_hrs, na.rm = TRUE),
+    n_bids            = n(),
+    first_bid_order   = min(bid_order),
+    total_bids_prop   = first(total_bids_prop),
+    .groups = "drop"
+  ) |>
+  mutate(
+    entry_stage  = first_bid_order / total_bids_prop,
+    first_bidder = as.integer(first_bid_order == 1)
+  )
+
+# Common ggplot theme for slides
+theme_presentation <- theme_minimal(base_size = 16) +
+  theme(
+    plot.title    = element_text(face = "bold", size = 18, hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5, colour = "grey40"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+## A Real Bidding War {background-color="#0b141a"}
+
+<iframe data-src="whatsapp-bidding.html" width="150%" height="700" style="border:none;"></iframe>
+
+## the Irish market is changing ...
+
+- Irish property market shifting from **opaque, agent-mediated** negotiations to **transparent digital platforms**
+- Online platforms allow buyers to observe competing bids in real time
+- Perceived as **fairer** by a majority of the public (Robertson et al., 2026)
+- But little is known on the impact of this new technology on the actual bidding behaviour.
+
+::: footer
+- [Robertson, D., Shier, A. J., Timmons, S., & Lunn, P. (2026). Buying and selling property in Ireland: Behavioural evidence on bidding systems, stressors and market comprehension. *ESRI Research Series No 226*](https://www.esri.ie/publications/buying-and-selling-property-in-ireland-behavioural-evidence-on-bidding-systems)
+:::
+
+## Data
+
+- **Source:** Anonymised transactional logs from an online offer management platform in Ireland (2018–2024)
+- **Each record**: timestamp, property-scoped buyer ID, offer amount (€), property ID
+- **After filtering** (negotiations with 2+ participants):
+
+```{r data-summary, echo=FALSE}
+tibble(
+  Metric = c("Properties", "Unique buyer", "Top-offer outcomes"),
+  Value  = c(
+    format(nrow(prop_summary), big.mark = ","),
+    format(nrow(bidder_summary), big.mark = ","),
+    paste0(round(mean(prop_summary$n_participants == 2) * 100), "%")
+  )
+) |>
+  knitr::kable()
+```
+
+## Descriptive Analysis
+
+**Property-level measures:**
+
+- Number of active participants
+- Total number of offers
+- Duration of negotiation window (first to last offer)
+- Trajectory of offer escalation
+
+**Participant-level measures:**
+
+- Average offer increment (€ above preceding offer)
+- Average response latency (hours between offers)
+- Number of offers placed
+
+# Results
+
+## Summary Statistics
+
+```{r summary-stats, echo=FALSE}
+clean_bidder <- bidder_summary |>
+  filter(
+    !is.na(avg_bid_increment) & is.finite(avg_bid_increment),
+    !is.na(avg_reaction_hrs) & is.finite(avg_reaction_hrs)
+  )
+
+fmt <- function(x, digits) {
+  sprintf(paste0("%.", digits, "f"), x)
+}
+
+entry_pct <- fmt(mean(clean_bidder$entry_stage, na.rm = TRUE) * 100, 0)
+first_pct <- fmt(mean(clean_bidder$first_bidder, na.rm = TRUE) * 100, 0)
+
+summary_tbl <- tibble(
+  Variable = c(
+    "Avg Bid Increment (\u20ac)",
+    "Avg Reaction Speed (hrs)",
+    "Total Bids Placed"
+  ),
+  Mean = c(
+    fmt(mean(clean_bidder$avg_bid_increment, na.rm = TRUE), 0),
+    fmt(mean(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2),
+    fmt(mean(clean_bidder$n_bids, na.rm = TRUE), 2)
+  ),
+  SD = c(
+    fmt(sd(clean_bidder$avg_bid_increment, na.rm = TRUE), 0),
+    fmt(sd(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2),
+    fmt(sd(clean_bidder$n_bids, na.rm = TRUE), 2)
+  ),
+  Min = c(
+    fmt(min(clean_bidder$avg_bid_increment, na.rm = TRUE), 0),
+    fmt(min(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2),
+    fmt(min(clean_bidder$n_bids, na.rm = TRUE), 0)
+  ),
+  Max = c(
+    fmt(max(clean_bidder$avg_bid_increment, na.rm = TRUE), 0),
+    fmt(max(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2),
+    fmt(max(clean_bidder$n_bids, na.rm = TRUE), 0)
+  )
+)
+
+knitr::kable(summary_tbl, format = "markdown", align = "lrrrr")
+```
+
+On average, bidders entered at **`r entry_pct`%** of the way through the bidding sequence. **`r first_pct`%** of bidders placed the first bid on a property.
+
+## Correlations
+
+:::: {layout="[2,1]"}
+::: {#first-column}
+```{r plot-correlations, echo=FALSE, fig.width=7, fig.height=5.5}
+cor_data <- clean_bidder |>
+  select(
+    `Avg Bid\nIncrement`  = avg_bid_increment,
+    `Avg Reaction\nSpeed` = avg_reaction_hrs,
+    `Entry\nStage`        = entry_stage,
+    `First\nBidder`       = first_bidder,
+    `Total\nBids`         = n_bids
+  )
+
+cor_mat <- cor(cor_data, use = "pairwise.complete.obs")
+
+# Keep only the lower triangle (set upper triangle to NA)
+cor_mat[upper.tri(cor_mat)] <- NA
+
+cor_long <- as.data.frame(as.table(cor_mat)) |>
+  rename(Var1 = Var1, Var2 = Var2, value = Freq) |>
+  filter(!is.na(value)) |>
+  mutate(
+    label = ifelse(
+      round(abs(value), 2) == 1,
+      "1.00",
+      sub("^0", "", sprintf("%.2f", value))
+    )
+  )
+
+ggplot(cor_long, aes(x = Var2, y = fct_rev(Var1), fill = value)) +
+  geom_tile(colour = "white", linewidth = 1) +
+  geom_text(aes(label = label), size = 5, fontface = "bold") +
+  scale_fill_gradient2(
+    low = "#e74c3c", mid = "white", high = "#1a5276",
+    midpoint = 0, limits = c(-1, 1),
+    name = "r"
+  ) +
+  labs(
+    title = "Correlation Matrix of\nNegotiation Variables",
+    x = NULL, y = NULL
+  ) +
+  theme_presentation +
+  theme(
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.position = "right"
+  ) +
+  coord_fixed()
+```
+:::
+
+::: {#second-column}
+- Later entrants bid higher and respond more slowly. 
+
+- First bidders place more offers but with smaller increments.
+:::
+::::
+
+## Competition
+
+:::: {layout="[2,1]"}
+::: {#first-column}
+```{r plot-competition, echo=FALSE, fig.width=7, fig.height=5}
+ggplot(prop_summary, aes(x = n_participants)) +
+  geom_histogram(
+    fill = "#2980b9", alpha = 0.85, colour = "white",
+    binwidth = 1, boundary = 0.5
+  ) +
+  geom_vline(
+    aes(xintercept = mean(n_participants)),
+    colour = "#e74c3c", linewidth = 1, linetype = "dashed"
+  ) +
+  annotate(
+    "text",
+    x = mean(prop_summary$n_participants) * 1.15,
+    y = Inf, vjust = 2, hjust = 0,
+    label = paste0("Mean \u2248 ", round(mean(prop_summary$n_participants), 1), " participants"),
+    colour = "#e74c3c", fontface = "bold", size = 5
+  ) +
+  scale_x_continuous(breaks = seq(2, max(prop_summary$n_participants), 1)) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    title = "Distribution of Active Participants\nper Property",
+    x = "Number of Active Participants",
+    y = "Number of Properties"
+  ) +
+  theme_presentation
+```
+:::
+
+::: {#second-column}
+- Most properties attract only 2 or 3 active bidders. 
+
+- However, a long tail of highly contested negotiations exists.
+:::
+::::
+
+## Offer Increments
+
+:::: {layout="[2,1]"}
+::: {#first-column}
+```{r plot-increments, echo=FALSE, fig.width=7, fig.height=5}
+increments <- bidder_summary |>
+  filter(!is.na(avg_bid_increment) & is.finite(avg_bid_increment) & avg_bid_increment > 0)
+
+ggplot(increments, aes(x = avg_bid_increment)) +
+  geom_histogram(
+    fill = "#27ae60", alpha = 0.85, colour = "white", bins = 30
+  ) +
+  geom_vline(
+    aes(xintercept = mean(avg_bid_increment)),
+    colour = "#e74c3c", linewidth = 1, linetype = "dashed"
+  ) +
+  annotate(
+    "text",
+    x = mean(increments$avg_bid_increment) * 1.1,
+    y = Inf, vjust = 2, hjust = 0,
+    label = paste0(
+      "Mean = \u20ac", format(round(mean(increments$avg_bid_increment)), big.mark = ","),
+      "\nSD = \u20ac", format(round(sd(increments$avg_bid_increment)), big.mark = ",")
+    ),
+    colour = "#e74c3c", fontface = "bold", size = 4.5
+  ) +
+  scale_x_log10(
+    labels = scales::label_currency(prefix = "\u20ac", big.mark = ",")
+  ) +
+  labs(
+    title = "Distribution of Average Offer\nIncrements",
+    x = "Average Offer Increment (\u20ac, log scale)",
+    y = "Frequency"
+  ) +
+  theme_presentation
+```
+:::
+
+::: {#second-column}
+- Bid increments are right-skewed as most are modest, but some buyers make very large jumps to signal commitment. 
+
+- Heavy use of €1k, €2.5k, and €5k jumps.
+:::
+::::
+
+## Response Latency
+
+:::: {layout="[2,1]"}
+::: {#first-column}
+```{r plot-latency, echo=FALSE, fig.width=7, fig.height=5}
+latency <- bidder_summary |>
+  filter(!is.na(avg_reaction_hrs) & is.finite(avg_reaction_hrs) & avg_reaction_hrs > 0)
+
+ggplot(latency, aes(x = avg_reaction_hrs)) +
+  geom_histogram(
+    fill = "#8e44ad", alpha = 0.85, colour = "white", bins = 40
+  ) +
+  geom_vline(
+    aes(xintercept = mean(avg_reaction_hrs)),
+    colour = "#e74c3c", linewidth = 1, linetype = "dashed"
+  ) +
+  annotate(
+    "text",
+    x = mean(latency$avg_reaction_hrs) * 1.3,
+    y = Inf, vjust = 2, hjust = 0,
+    label = paste0(
+      "Mean \u2248 ", round(mean(latency$avg_reaction_hrs), 1), " hours",
+      "\nSD = ", round(sd(latency$avg_reaction_hrs), 1), " hours"
+    ),
+    colour = "#e74c3c", fontface = "bold", size = 4.5
+  ) +
+  scale_x_continuous(
+    trans = "log1p",
+    breaks = c(1, 6, 12, 24, 48, 168, 720),
+    labels = c("1h", "6h", "12h", "1d", "2d", "1w", "1m")
+  ) +
+  labs(
+    title = "Distribution of Average\nResponse Latency",
+    x = "Average Response Latency (log scale)",
+    y = "Frequency"
+  ) +
+  theme_presentation
+```
+:::
+
+::: {#second-column}
+Most responses come within hours, suggesting real-time competitive pressure, though some negotiations stretch over weeks.
+:::
+::::
+
+## Competition and Price Premium
+
+:::: {layout="[2,1]"}
+::: {#first-column}
+```{r plot-premium, echo=FALSE, fig.width=7, fig.height=5}
+premium_ind <- prop_summary |>
+  mutate(
+    n_grp = case_when(
+      n_participants == 2 ~ "2",
+      n_participants == 3 ~ "3",
+      n_participants == 4 ~ "4",
+      n_participants >= 5 ~ "5+"
+    ),
+    n_grp = factor(n_grp, levels = c("2", "3", "4", "5+")),
+    n_num  = as.numeric(n_grp)
+  )
+
+# Mean and upper whisker per group (for label placement)
+premium_means <- premium_ind |>
+  group_by(n_grp, n_num) |>
+  summarise(
+    mean_premium = mean(premium_pct, na.rm = TRUE),
+    q3           = quantile(premium_pct, 0.75, na.rm = TRUE),
+    iqr          = IQR(premium_pct, na.rm = TRUE),
+    upper_whisker = min(
+      max(premium_pct, na.rm = TRUE),
+      q3 + 1.5 * iqr
+    ),
+    .groups = "drop"
+  )
+
+ggplot(premium_ind, aes(x = n_num, y = premium_pct)) +
+  # Half-violin (density) -- shifted right
+  geom_violin(
+    aes(group = n_grp),
+    trim = TRUE, scale = "width", width = 0.6,
+    fill = "#e67e22", alpha = 0.3, colour = NA,
+    position = position_nudge(x = 0.15)
+  ) +
+  # Boxplot -- centred
+  geom_boxplot(
+    aes(group = n_grp),
+    width = 0.15, outlier.shape = NA,
+    fill = "#e67e22", alpha = 0.7, colour = "#2c3e50"
+  ) +
+  # Jittered points -- shifted left
+  geom_jitter(
+    aes(x = n_num - 0.2),
+    width = 0.06, height = 0, size = 1.2,
+    alpha = 0.35, colour = "#c0392b"
+  ) +
+  # Mean markers
+  geom_point(
+    data = premium_means,
+    aes(x = n_num, y = mean_premium),
+    shape = 18, size = 4, colour = "#2c3e50"
+  ) +
+  # Mean labels -- positioned above the upper whisker to avoid overlap
+  geom_text(
+    data = premium_means,
+    aes(
+      x = n_num, y = upper_whisker,
+      label = paste0("M = ", round(mean_premium, 1), "%")
+    ),
+    vjust = -0.8, fontface = "bold", colour = "#2c3e50", size = 4.5
+  ) +
+  scale_x_continuous(
+    breaks = 1:4,
+    labels = levels(premium_ind$n_grp)
+  ) +
+  scale_y_continuous(labels = scales::label_percent(scale = 1)) +
+  coord_cartesian(clip = "off") +
+  labs(
+    title = "Competition Intensity and\nPrice Premium",
+    x = "Number of Active Participants",
+    y = "Premium Above First Offer (%)"
+  ) +
+  theme_presentation +
+  theme(plot.margin = margin(15, 10, 10, 10))
+```
+:::
+
+::: {#second-column}
+More participants drive higher final prices, consistent with competitive arousal and auction fever dynamics.
+:::
+::::
+
+<!-- ## Ghost Bidders or Chancers -->
+
+<!-- :::: {layout="[2,1]"} -->
+<!-- ::: {#first-column} -->
+<!-- ```{r plot-ghost, echo=FALSE, fig.width=7, fig.height=5} -->
+<!-- # A "ghost bidder" places exactly 1 bid and never returns, -->
+<!-- # EXCLUDING single-bid participants whose bid was the top offer -->
+<!-- top_bidders <- bids |> -->
+<!--   filter(sale_id %in% prop_summary$sale_id) |> -->
+<!--   group_by(sale_id) |> -->
+<!--   slice_max(bid_amount, n = 1, with_ties = FALSE) |> -->
+<!--   ungroup() |> -->
+<!--   select(sale_id, top_bidder = bidder_id) -->
+
+<!-- ghost_grouped <- bidder_summary |> -->
+<!--   left_join( -->
+<!--     prop_summary |> select(sale_id, n_participants), -->
+<!--     by = "sale_id" -->
+<!--   ) |> -->
+<!--   left_join(top_bidders, by = "sale_id") |> -->
+<!--   mutate( -->
+<!--     is_top_bidder = (bidder_id == top_bidder), -->
+<!--     n_grp = case_when( -->
+<!--       n_participants == 2 ~ "2", -->
+<!--       n_participants == 3 ~ "3", -->
+<!--       n_participants == 4 ~ "4", -->
+<!--       n_participants >= 5 ~ "5+" -->
+<!--     ), -->
+<!--     n_grp = factor(n_grp, levels = c("2", "3", "4", "5+")), -->
+<!--     bidder_type = case_when( -->
+<!--       n_bids == 1 & is_top_bidder  ~ "Ghost + Top Offer", -->
+<!--       n_bids == 1 & !is_top_bidder ~ "Ghost (not top)", -->
+<!--       TRUE ~ "Active (2+ bids)" -->
+<!--     ), -->
+<!--     bidder_type = factor( -->
+<!--       bidder_type, -->
+<!--       levels = c("Ghost + Top Offer", "Ghost (not top)", "Active (2+ bids)") -->
+<!--     ) -->
+<!--   ) |> -->
+<!--   count(n_grp, bidder_type, .drop = FALSE) |> -->
+<!--   group_by(n_grp) |> -->
+<!--   mutate(pct = n / sum(n) * 100) |> -->
+<!--   ungroup() -->
+
+<!-- ggplot(ghost_grouped, aes(x = n_grp, y = n, fill = bidder_type)) + -->
+<!--   geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.85) + -->
+<!--   geom_text( -->
+<!--     aes(label = paste0(round(pct), "%")), -->
+<!--     position = position_dodge(width = 0.8), -->
+<!--     vjust = -0.5, fontface = "bold", size = 4 -->
+<!--   ) + -->
+<!--   scale_fill_manual( -->
+<!--     values = c( -->
+<!--       "Ghost + Top Offer" = "#e67e22", -->
+<!--       "Ghost (not top)"   = "#7f8c8d", -->
+<!--       "Active (2+ bids)"  = "#2980b9" -->
+<!--     ), -->
+<!--     name = NULL -->
+<!--   ) + -->
+<!--   scale_y_continuous(expand = expansion(mult = c(0, 0.15))) + -->
+<!--   labs( -->
+<!--     title = "Ghost vs Active Bidders by\nCompetition Intensity", -->
+<!--     subtitle = "Ghost = placed exactly one bid", -->
+<!--     x = "Number of Active Participants", -->
+<!--     y = "Number of Bidder-Property Pairs" -->
+<!--   ) + -->
+<!--   theme_presentation + -->
+<!--   theme(legend.position = "top") -->
+<!-- ``` -->
+<!-- ::: -->
+
+<!-- ::: {#second-column} -->
+<!-- A substantial share of participants bid once and vanish, inflating apparent competition without sustained engagement. -->
+<!-- ::: -->
+<!-- :::: -->
+
+## Discussion & Implications
+
+- Real-world online negotiations involve **meaningful competitive dynamics**, not just passive price discovery
+- The association between participation intensity and premiums is consistent with **competitive arousal** (McGee, 2013; Hammervold et al., 2025)
+- **Future work:** examination of offer-level behaviours associated with different negotiation outcomes
+
+::: footer
+- [McGee, P. (2013). Bidding in private-value auctions with uncertain values. *Games and Economic Behavior*, 82, 312–326.](https://www.sciencedirect.com/science/article/abs/pii/S0899825613001188)
+- [Hammervold, R., Olaussen, J. O., Oust, A., Sommervoll, D. E., & Sønstebø, O. J. (2025). Some like it hot: The effect of auction temperature on urban real estate prices. Real Estate Economics, 53, 1284–1308.](https://doi.org/10.1111/1540-6229.70004)
+
+:::
+
+<!-- ## References -->
+
+<!-- ::: {style="font-size: 0.55em;"} -->
+
+<!-- - Hammervold, R. et al. (2025). Some like it hot: The effect of auction temperature on urban real estate prices. *Real Estate Economics*, 53(6), 1284–1308. -->
+<!-- - Kahneman, D. & Tversky, A. (1979). Prospect theory. *Econometrica*, 47(2), 263–291. -->
+<!-- - Lunn, P. et al. (2025). Buying and selling houses in Ireland. *ESRI Working Paper*, No. 811. -->
+<!-- - McGee, P. (2013). Bidding in private-value auctions with uncertain values. *Games and Economic Behavior*, 82, 312–326. -->
+<!-- - Robertson, D. et al. (2026). Buying and selling property in Ireland. *ESRI Research Series*, No. 226. -->
+<!-- - Sonstebo, O.J. et al. (2021). The heat of the moment. *Scandinavian Journal of Economics*, 123(4), 1188–1215. -->
+
+<!-- ::: -->
+
+## {background-color="#0b141a"}
+
+<iframe data-src="thankyou-phone.html" width="100%" height="700" style="border:none;"></iframe>
