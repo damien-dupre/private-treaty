@@ -142,111 +142,52 @@ tibble(
 
 # Results
 
-## Summary Statistics
+<!-- ## Summary Statistics -->
 
-```{r summary-stats, echo=FALSE}
-clean_bidder <- bidder_summary |>
-  filter(
-    !is.na(avg_bid_increment) & is.finite(avg_bid_increment),
-    !is.na(avg_reaction_hrs) & is.finite(avg_reaction_hrs)
-  )
+<!-- ```{r summary-stats, echo=FALSE} -->
+<!-- clean_bidder <- bidder_summary |> -->
+<!--   filter( -->
+<!--     !is.na(avg_bid_increment) & is.finite(avg_bid_increment), -->
+<!--     !is.na(avg_reaction_hrs) & is.finite(avg_reaction_hrs) -->
+<!--   ) -->
 
-fmt <- function(x, digits) {
-  sprintf(paste0("%.", digits, "f"), x)
-}
+<!-- fmt <- function(x, digits) { -->
+<!--   sprintf(paste0("%.", digits, "f"), x) -->
+<!-- } -->
 
-entry_pct <- fmt(mean(clean_bidder$entry_stage, na.rm = TRUE) * 100, 0)
-first_pct <- fmt(mean(clean_bidder$first_bidder, na.rm = TRUE) * 100, 0)
+<!-- entry_pct <- fmt(mean(clean_bidder$entry_stage, na.rm = TRUE) * 100, 0) -->
+<!-- first_pct <- fmt(mean(clean_bidder$first_bidder, na.rm = TRUE) * 100, 0) -->
 
-summary_tbl <- tibble(
-  Variable = c(
-    "Avg Bid Increment (\u20ac)",
-    "Avg Reaction Speed (hrs)",
-    "Total Bids Placed"
-  ),
-  Mean = c(
-    fmt(mean(clean_bidder$avg_bid_increment, na.rm = TRUE), 0),
-    fmt(mean(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2),
-    fmt(mean(clean_bidder$n_bids, na.rm = TRUE), 2)
-  ),
-  SD = c(
-    fmt(sd(clean_bidder$avg_bid_increment, na.rm = TRUE), 0),
-    fmt(sd(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2),
-    fmt(sd(clean_bidder$n_bids, na.rm = TRUE), 2)
-  ),
-  Min = c(
-    fmt(min(clean_bidder$avg_bid_increment, na.rm = TRUE), 0),
-    fmt(min(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2),
-    fmt(min(clean_bidder$n_bids, na.rm = TRUE), 0)
-  ),
-  Max = c(
-    fmt(max(clean_bidder$avg_bid_increment, na.rm = TRUE), 0),
-    fmt(max(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2),
-    fmt(max(clean_bidder$n_bids, na.rm = TRUE), 0)
-  )
-)
+<!-- summary_tbl <- tibble( -->
+<!--   Variable = c( -->
+<!--     "Avg Bid Increment (\u20ac)", -->
+<!--     "Avg Reaction Speed (hrs)", -->
+<!--     "Total Bids Placed" -->
+<!--   ), -->
+<!--   Mean = c( -->
+<!--     fmt(mean(clean_bidder$avg_bid_increment, na.rm = TRUE), 0), -->
+<!--     fmt(mean(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2), -->
+<!--     fmt(mean(clean_bidder$n_bids, na.rm = TRUE), 2) -->
+<!--   ), -->
+<!--   SD = c( -->
+<!--     fmt(sd(clean_bidder$avg_bid_increment, na.rm = TRUE), 0), -->
+<!--     fmt(sd(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2), -->
+<!--     fmt(sd(clean_bidder$n_bids, na.rm = TRUE), 2) -->
+<!--   ), -->
+<!--   Min = c( -->
+<!--     fmt(min(clean_bidder$avg_bid_increment, na.rm = TRUE), 0), -->
+<!--     fmt(min(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2), -->
+<!--     fmt(min(clean_bidder$n_bids, na.rm = TRUE), 0) -->
+<!--   ), -->
+<!--   Max = c( -->
+<!--     fmt(max(clean_bidder$avg_bid_increment, na.rm = TRUE), 0), -->
+<!--     fmt(max(clean_bidder$avg_reaction_hrs, na.rm = TRUE), 2), -->
+<!--     fmt(max(clean_bidder$n_bids, na.rm = TRUE), 0) -->
+<!--   ) -->
+<!-- ) -->
 
-knitr::kable(summary_tbl, format = "markdown", align = "lrrrr")
-```
-
-## Correlations
-
-:::: {layout="[2,1]"}
-::: {#first-column}
-```{r plot-correlations, echo=FALSE, fig.width=7, fig.height=5.5}
-cor_data <- clean_bidder |>
-  select(
-    `Avg Bid\nIncrement`  = avg_bid_increment,
-    `Avg Reaction\nSpeed` = avg_reaction_hrs,
-    `Entry\nStage`        = entry_stage,
-    `First\nBidder`       = first_bidder,
-    `Total\nBids`         = n_bids
-  )
-
-cor_mat <- cor(cor_data, use = "pairwise.complete.obs")
-
-# Keep only the lower triangle (set upper triangle to NA)
-cor_mat[upper.tri(cor_mat)] <- NA
-
-cor_long <- as.data.frame(as.table(cor_mat)) |>
-  rename(Var1 = Var1, Var2 = Var2, value = Freq) |>
-  filter(!is.na(value)) |>
-  mutate(
-    label = ifelse(
-      round(abs(value), 2) == 1,
-      "1.00",
-      sub("^0", "", sprintf("%.2f", value))
-    )
-  )
-
-ggplot(cor_long, aes(x = Var2, y = fct_rev(Var1), fill = value)) +
-  geom_tile(colour = "white", linewidth = 1) +
-  geom_text(aes(label = label), size = 5, fontface = "bold") +
-  scale_fill_gradient2(
-    low = "#e74c3c", mid = "white", high = "#1a5276",
-    midpoint = 0, limits = c(-1, 1),
-    name = "r"
-  ) +
-  labs(
-    title = "Correlation Matrix of\nNegotiation Variables",
-    x = NULL, y = NULL
-  ) +
-  theme_presentation +
-  theme(
-    axis.text.x = element_text(size = 10),
-    axis.text.y = element_text(size = 10),
-    legend.position = "right"
-  ) +
-  coord_fixed()
-```
-:::
-
-::: {#second-column}
-- Later entrants bid higher and respond more slowly. 
-
-- First bidders place more offers but with smaller increments.
-:::
-::::
+<!-- knitr::kable(summary_tbl, format = "markdown", align = "lrrrr") -->
+<!-- ``` -->
 
 ## Competition
 
@@ -463,6 +404,73 @@ ggplot(premium_ind, aes(x = n_num, y = premium_pct)) +
 More participants drive higher final prices, consistent with competitive arousal and auction fever dynamics.
 :::
 ::::
+
+## Correlations
+
+:::: {layout="[2,1]"}
+::: {#first-column}
+```{r plot-correlations, echo=FALSE, fig.width=7, fig.height=5.5}
+clean_bidder <- bidder_summary |>
+  filter(
+    !is.na(avg_bid_increment) & is.finite(avg_bid_increment),
+    !is.na(avg_reaction_hrs) & is.finite(avg_reaction_hrs)
+  )
+
+cor_data <- clean_bidder |>
+  select(
+    `Avg Bid\nIncrement`  = avg_bid_increment,
+    `Avg Reaction\nSpeed` = avg_reaction_hrs,
+    `Entry\nStage`        = entry_stage,
+    `First\nBidder`       = first_bidder,
+    `Total\nBids`         = n_bids
+  )
+
+cor_mat <- cor(cor_data, use = "pairwise.complete.obs")
+
+# Keep only the lower triangle (set upper triangle to NA)
+cor_mat[upper.tri(cor_mat)] <- NA
+
+cor_long <- as.data.frame(as.table(cor_mat)) |>
+  rename(Var1 = Var1, Var2 = Var2, value = Freq) |>
+  filter(!is.na(value)) |>
+  mutate(
+    label = ifelse(
+      round(abs(value), 2) == 1,
+      "1.00",
+      sub("^0", "", sprintf("%.2f", value))
+    )
+  )
+
+ggplot(cor_long, aes(x = Var2, y = fct_rev(Var1), fill = value)) +
+  geom_tile(colour = "white", linewidth = 1) +
+  geom_text(aes(label = label), size = 5, fontface = "bold") +
+  scale_fill_gradient2(
+    low = "#e74c3c", mid = "white", high = "#1a5276",
+    midpoint = 0, limits = c(-1, 1),
+    name = "r"
+  ) +
+  labs(
+    title = "Correlation Matrix of\nNegotiation Variables",
+    x = NULL, y = NULL
+  ) +
+  theme_presentation +
+  theme(
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.position = "right"
+  ) +
+  coord_fixed()
+```
+:::
+
+::: {#second-column}
+- Later entrants bid higher and respond more slowly. 
+
+- First bidders place more offers but with smaller increments.
+:::
+::::
+
+
 
 <!-- ## Ghost Bidders or Chancers -->
 
